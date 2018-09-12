@@ -1,0 +1,4 @@
+project_id = "Project ID"
+subscription_name = "Subscription name"
+credentials = "Path to credential file"
+debug = false

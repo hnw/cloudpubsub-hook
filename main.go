@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"os/exec"
+	"strings"
 	"sync"
 
 	"cloud.google.com/go/pubsub"
@@ -25,7 +27,6 @@ func main() {
 		log.Fatalf("Failed to decode TOML: %v", err)
 		return
 	}
-
 	os.Setenv("GOOGLE_APPLICATION_CREDENTIALS", "config/"+conf.Credentials)
 
 	ctx := context.Background()
@@ -53,16 +54,31 @@ func main() {
 			return
 		}
 		fmt.Printf("Got message: %q\n", string(msg.Data))
-		resultMsg := pubsub.Message{
-			Data:       []byte("!!! " + string(msg.Data)),
-			Attributes: msg.Attributes,
+		cmdOut, err := execCommand(string(msg.Data))
+		if err == nil {
+			resultMsg := pubsub.Message{
+				Data:       []byte(cmdOut),
+				Attributes: msg.Attributes,
+			}
+			res := topic.Publish(cctx, &resultMsg)
+			res.Get(cctx)
 		}
-		res := topic.Publish(cctx, &resultMsg)
-		res.Get(cctx)
 		msg.Ack()
 	})
 	if err != nil {
 		log.Fatalf("Failed to receiving messages: %v", err)
 		return
 	}
+}
+
+func execCommand(cmd string) (string, error) {
+	args := strings.Split(cmd, " ")
+	if len(args) >= 2 {
+		out, err := exec.Command(args[1], args[2:]...).Output()
+		if err != nil {
+			return "", err
+		}
+		return string(out), nil
+	}
+	return "", nil
 }

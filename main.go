@@ -14,6 +14,7 @@ import (
 type Config struct {
 	ProjectID        string `toml:"project_id"`
 	SubscriptionName string `toml:"subscription_name"`
+	TopicName        string `toml:"topic_name"`
 	Credentials      string
 	Debug            bool
 }
@@ -39,10 +40,7 @@ func main() {
 	received := 0
 
 	sub := client.Subscription(conf.SubscriptionName)
-	if err != nil {
-		log.Fatalf("Failed to subscribe: %v", err)
-		return
-	}
+	topic := client.Topic(conf.TopicName)
 
 	cctx, cancel := context.WithCancel(ctx)
 	err = sub.Receive(cctx, func(ctx context.Context, msg *pubsub.Message) {
@@ -55,6 +53,12 @@ func main() {
 			return
 		}
 		fmt.Printf("Got message: %q\n", string(msg.Data))
+		resultMsg := pubsub.Message{
+			Data:       []byte("!!! " + string(msg.Data)),
+			Attributes: msg.Attributes,
+		}
+		res := topic.Publish(cctx, &resultMsg)
+		res.Get(cctx)
 		msg.Ack()
 	})
 	if err != nil {

@@ -1,4 +1,5 @@
 project_id = "Project ID"
 subscription_name = "Subscription name"
+topic_name = "Topic name"
 credentials = "Path to credential file"
 debug = false

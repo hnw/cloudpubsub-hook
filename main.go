@@ -19,6 +19,14 @@ type Config struct {
 	TopicName        string `toml:"topic_name"`
 	Credentials      string
 	Debug            bool
+	Pattern          map[string]Pattern
+}
+
+type Pattern struct {
+	Command   string
+	PassArgs  bool `toml:"pass_args"`
+	PassStdin bool `toml:"pass_stdin"`
+	ExpandEnv bool `toml:"expand_env"`
 }
 
 func main() {
@@ -69,6 +77,22 @@ func main() {
 		log.Fatalf("Failed to receiving messages: %v", err)
 		return
 	}
+}
+
+func matchedKeyFromDict(dict map[string]Pattern, args []string) (string, error) {
+	key := ""
+	prevKey := ""
+	for _, v := range args {
+		key += v
+		if _, ok := dict[key]; !ok {
+			if prevKey != "" {
+				break
+			}
+			return "", nil
+		}
+		prevKey = key
+	}
+	return prevKey, nil
 }
 
 func execCommand(cmd string) (string, error) {

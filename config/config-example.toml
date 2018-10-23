@@ -3,3 +3,15 @@ subscription_name = "Subscription name"
 topic_name = "Topic name"
 credentials = "Path to credential file"
 debug = false
+
+[pattern."fortune"]
+command = 'fortune'
+pass_args = false
+
+[pattern."echo"]
+command = 'echo'
+pass_args = true
+
+[pattern."base64"]
+command = 'base64'
+pass_stdin = true

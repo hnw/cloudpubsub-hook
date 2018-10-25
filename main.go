@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -80,19 +81,19 @@ func main() {
 }
 
 func matchedKeyFromDict(dict map[string]Pattern, args []string) (string, error) {
-	key := ""
-	prevKey := ""
-	for _, v := range args {
-		key += v
-		if _, ok := dict[key]; !ok {
-			if prevKey != "" {
-				break
-			}
-			return "", nil
+	hitKey := ""
+	for i := range args {
+		key := strings.Join(args[:i+1], " ")
+		if _, ok := dict[key]; ok {
+			hitKey = key
 		}
-		prevKey = key
 	}
-	return prevKey, nil
+	if hitKey == "" {
+		if _, ok := dict[hitKey]; !ok {
+			return "", errors.New("Input text is not in dictionary")
+		}
+	}
+	return hitKey, nil
 }
 
 func execCommand(cmd string) (string, error) {

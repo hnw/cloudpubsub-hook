@@ -3,9 +3,11 @@ package main
 import (
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"os/exec"
+	"regexp"
 	"strings"
 	"sync"
 
@@ -62,16 +64,20 @@ func main() {
 			msg.Nack()
 			return
 		}
-		fmt.Printf("Got message: %q\n", string(msg.Data))
-		cmdOut, err := execCommand(string(msg.Data))
-		if err == nil {
-			resultMsg := pubsub.Message{
-				Data:       []byte(cmdOut),
-				Attributes: msg.Attributes,
-			}
-			res := topic.Publish(cctx, &resultMsg)
-			res.Get(cctx)
+		log.Printf("Got message: %q\n", string(msg.Data))
+		cmdOut, err := execCommand(conf, string(msg.Data))
+		if err != nil {
+			log.Println("Command not found")
+			msg.Ack()
+			return
 		}
+		log.Printf("Command output: %q\n", cmdOut)
+		resultMsg := pubsub.Message{
+			Data:       []byte(cmdOut),
+			Attributes: msg.Attributes,
+		}
+		res := topic.Publish(cctx, &resultMsg)
+		res.Get(cctx)
 		msg.Ack()
 	})
 	if err != nil {
@@ -96,14 +102,43 @@ func matchedKeyFromDict(dict map[string]Pattern, args []string) (string, error) 
 	return hitKey, nil
 }
 
-func execCommand(cmd string) (string, error) {
-	args := strings.Split(cmd, " ")
-	if len(args) >= 2 {
-		out, err := exec.Command(args[1], args[2:]...).Output()
-		if err != nil {
-			return "", err
-		}
-		return string(out), nil
+func execCommand(conf Config, cmdText string) (string, error) {
+	re := regexp.MustCompile("[\t\n\v\f\r ]+")
+	args := re.Split(cmdText, -1)
+	matched, err := matchedKeyFromDict(conf.Pattern, args)
+	if err != nil {
+		return "", err
 	}
-	return "", nil
+	pt := conf.Pattern[matched]
+	nMatched := len(re.Split(matched, -1))
+	cmdInput := ""
+	if pt.PassArgs {
+		args = append(re.Split(pt.Command, -1), args[nMatched:]...)
+	} else {
+		args = re.Split(pt.Command, -1)
+		if pt.PassStdin {
+			arr := re.Split(cmdText, nMatched+1)
+			if len(arr) == nMatched+1 {
+				cmdInput = arr[nMatched]
+			}
+		}
+	}
+
+	if len(args) <= 0 {
+		return "", errors.New("command to execute is not specified")
+	}
+	cmd := exec.Command(args[0], args[1:]...)
+	if len(cmdInput) > 0 {
+		r, w := io.Pipe()
+		cmd.Stdin = r
+		go func() {
+			fmt.Fprint(w, cmdInput)
+			w.Close()
+		}()
+	}
+	cmdOutput, err := c.Output()
+	if err != nil {
+		return "", err
+	}
+	return string(cmdOutput), nil
 }
